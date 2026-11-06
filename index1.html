@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AIX Operations & Staff Management Portal</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --panel: #161b22;
+            --accent: #2f81f7;
+            --accent-hover: #58a6ff;
+            --text-main: #f0f6fc;
+            --text-sub: #8b949e;
+            --border: #30363d;
+            --danger: #f85149;
+            --success: #238636;
+            --warning: #d29922;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg); color: var(--text-main); display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; }
+
+        /* --- LOGIN OVERLAY --- */
+        #login-overlay {
+            position: fixed; inset: 0; background: var(--bg); display: flex; 
+            justify-content: center; align-items: center; z-index: 9999;
+            transition: opacity 0.4s ease;
+        }
+        .login-card {
+            background: var(--panel); border: 1px solid var(--border); padding: 40px; 
+            border-radius: 12px; width: 100%; max-width: 400px; text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        }
+        .login-card h2 { margin-bottom: 8px; color: var(--accent); }
+        .login-card p { color: var(--text-sub); font-size: 0.9rem; margin-bottom: 20px; }
+        .login-card input {
+            width: 100%; padding: 12px; background: var(--bg); border: 1px solid var(--border);
+            color: #fff; border-radius: 6px; margin-bottom: 12px; outline: none;
+        }
+        .login-card input:focus { border-color: var(--accent); }
+
+        /* --- INTRO SCREEN OVERLAY --- */
+        #intro-overlay {
+            position: fixed; inset: 0; background: rgba(13, 17, 23, 0.96); display: none;
+            flex-direction: column; justify-content: center; align-items: center; z-index: 9998;
+            padding: 20px; text-align: center;
+        }
+        .typewriter-box {
+            font-size: 1.5rem; font-weight: 600; color: var(--accent-hover);
+            max-width: 700px; line-height: 1.5; margin-bottom: 30px; min-height: 80px;
+        }
+        .cursor { display: inline-block; background-color: var(--accent); width: 10px; height: 26px; animation: blink 0.8s infinite; vertical-align: middle; margin-left: 4px; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        /* --- HEADER --- */
+        header {
+            background: var(--panel); border-bottom: 1px solid var(--border);
+            padding: 15px 30px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .logo { font-size: 1.4rem; font-weight: bold; color: var(--accent); letter-spacing: 1px; }
+        .user-status { display: flex; align-items: center; gap: 15px; }
+        .badge { 
+            padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; text-transform: uppercase; font-weight: bold;
+        }
+        .badge-admin { background: rgba(248, 81, 73, 0.2); color: var(--danger); border: 1px solid rgba(248, 81, 73, 0.4); }
+        .badge-staff { background: rgba(47, 129, 247, 0.2); color: var(--accent); border: 1px solid rgba(47, 129, 247, 0.4); }
+
+        /* --- LAYOUT --- */
+        .app-container { display: flex; flex: 1; }
+        sidebar {
+            width: 260px; background: var(--panel); border-right: 1px solid var(--border);
+            padding: 20px 10px; display: flex; flex-direction: column; gap: 6px;
+        }
+
+        sidebar button {
+            background: transparent; border: none; color: var(--text-sub); padding: 12px 16px;
+            text-align: left; border-radius: 6px; cursor: pointer; font-size: 0.95rem; font-weight: 500;
+            transition: all 0.25s ease;
+        }
+        sidebar button:hover { background: rgba(47, 129, 247, 0.12); color: var(--text-main); }
+        sidebar button.active { background: rgba(47, 129, 247, 0.2); color: var(--accent-hover); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+
+        main { flex: 1; padding: 30px; overflow-y: auto; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        h2 { font-size: 1.5rem; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 25px; }
+        
+        .card { 
+            background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px;
+            margin-bottom: 15px; transition: border-color 0.25s ease;
+        }
+        .card:hover { border-color: rgba(47, 129, 247, 0.4); }
+        .card h3 { color: var(--accent); font-size: 1.1rem; margin-bottom: 10px; }
+        .card p { color: var(--text-sub); font-size: 0.9rem; line-height: 1.4; margin-bottom: 15px; }
+
+        .btn { 
+            background: var(--accent); color: #fff; border: none; padding: 8px 16px; 
+            border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: all 0.2s ease;
+        }
+        .btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        .btn-small { padding: 5px 12px; font-size: 0.8rem; }
+        .btn-danger { background: var(--danger); }
+        .btn-success { background: var(--success); }
+        .btn-warning { background: var(--warning); color: #000; }
+
+        /* --- BANNER --- */
+        .slideshow-container {
+            position: relative; width: 100%; height: 220px; border-radius: 12px;
+            overflow: hidden; border: 1px solid var(--border); margin-bottom: 30px;
+        }
+        .slide-img {
+            position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+            opacity: 0; transition: opacity 0.8s ease;
+        }
+        .slide-img.active { opacity: 1; }
+        .slideshow-overlay {
+            position: absolute; inset: 0;
+            background: linear-gradient(180deg, rgba(13, 17, 23, 0.2) 0%, rgba(13, 17, 23, 0.9) 100%);
+            display: flex; flex-direction: column; justify-content: flex-end; padding: 20px; z-index: 2;
+        }
+
+        /* --- TABLES & FORMS --- */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; font-size: 0.9rem; }
+        th { background: rgba(47, 129, 247, 0.1); color: var(--accent-hover); }
+        tr:nth-child(even) { background: rgba(255, 255, 255, 0.02); }
+
+        .status-tag { padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; display: inline-block; }
+        .status-active { background: rgba(35, 134, 54, 0.2); color: #3fb950; border: 1px solid rgba(35, 134, 54, 0.4); }
+        .status-loa { background: rgba(210, 153, 34, 0.2); color: #d29922; border: 1px solid rgba(210, 153, 34, 0.4); }
+
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; margin-bottom: 6px; font-size: 0.85rem; color: var(--text-sub); }
+        .input-group input, .input-group select, .input-group textarea {
+            width: 100%; padding: 10px; background: var(--bg); border: 1px solid var(--border);
+            color: #fff; border-radius: 6px; outline: none; font-size: 0.9rem;
+        }
+        .input-group textarea { resize: vertical; height: 90px; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. LOGIN OVERLAY -->
+    <div id="login-overlay">
+        <div class="login-card">
+            <h2>AIX Staff Login</h2>
+            <p>Access your staff control panel.</p>
+            <input type="text" id="login-username" placeholder="Username (e.g. Him or KOD)">
+            <input type="password" id="login-password" placeholder="Password">
+            <button class="btn" style="width:100%; margin-top:5px;" onclick="handleLogin()">Log In</button>
+            <p id="login-err" style="color:var(--danger); display:none; margin-top:12px; font-size:0.85rem;">Invalid Account Credentials</p>
+        </div>
+    </div>
+
+    <!-- 2. TYPEWRITER INTRO OVERLAY -->
+    <div id="intro-overlay">
+        <div class="typewriter-box">
+            <span id="typewriter-text"></span><span class="cursor"></span>
+        </div>
+        <button class="btn" onclick="skipIntro()">Proceed to Portal 🚀</button>
+    </div>
+
+    <!-- 3. HEADER BAR -->
+    <header>
+        <div class="logo">AIX PORTAL</div>
+        <div class="user-status">
+            <span id="logged-user-display" style="font-size:0.9rem; color:var(--text-sub);">Not Logged In</span>
+            <span id="user-role-badge" class="badge badge-staff">Staff</span>
+            <button class="btn btn-small btn-danger" onclick="logout()">Logout</button>
+        </div>
+    </header>
+
+    <!-- 4. APP CONTAINER -->
+    <div class="app-container">
+        <sidebar>
+            <button class="nav-btn active" onclick="switchTab('dashboard', this)">🏠 Dashboard</button>
+            <button class="nav-btn" onclick="switchTab('roster', this)">👥 Roster & Roles</button>
+            <button class="nav-btn" onclick="switchTab('events', this)">📅 Events & Training</button>
+            <button class="nav-btn" onclick="switchTab('reports', this)">🚨 Report System</button>
+            <button class="nav-btn" onclick="switchTab('resources', this)">📚 Handbooks & Docs</button>
+            <button class="nav-btn" id="admin-nav-btn" style="display:none; color: var(--danger);" onclick="switchTab('admin', this)">⚙️ Admin Control Panel</button>
+        </sidebar>
+
+        <main>
+            <!-- DASHBOARD -->
+            <div id="dashboard" class="tab-content active">
+                <div class="slideshow-container">
+                    <img class="slide-img active" src="banner-plane.png" alt="Slide 1">
+                    <img class="slide-img" src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1200&q=80" alt="Slide 2">
+                    <div class="slideshow-overlay">
+                        <h3>✈️ Air India Express Virtual Operations</h3>
+                        <p>Unified Staff Control Center</p>
+                    </div>
+                </div>
+
+                <h2>Operational Overview</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3>Quick Stats</h3>
+                        <p id="stats-display">Active Staff: -- | Open Reports: --</p>
+                    </div>
+                    <div class="card">
+                        <h3>System Notice</h3>
+                        <p>Remember to update your attendance status for upcoming weekend flight training sessions.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STAFF ROSTER & ROLES -->
+            <div id="roster" class="tab-content">
+                <h2>Staff Roster & Ranks</h2>
+                <input type="text" id="rosterSearch" class="input-group" style="padding:10px; background:var(--panel); border:1px solid var(--border); color:#fff; width:100%; margin-bottom:15px; border-radius:6px;" placeholder="Filter by name, role, or status..." onkeyup="renderRoster()">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Rank & Title</th>
+                            <th>Department</th>
+                            <th>Duty Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rosterTableBody"></tbody>
+                </table>
+            </div>
+
+            <!-- EVENTS & TRAINING -->
+            <div id="events" class="tab-content">
+                <h2>Upcoming Events & Training</h2>
+                <div id="eventsListContainer"></div>
+            </div>
+
+            <!-- REPORT SYSTEM -->
+            <div id="reports" class="tab-content">
+                <h2>Submit User / Incident Report</h2>
+                <div class="card" style="max-width:600px;">
+                    <h3>New Incident Report</h3>
+                    <div class="input-group">
+                        <label>Target Username / ID</label>
+                        <input type="text" id="reportTarget" placeholder="Enter username being reported...">
+                    </div>
+                    <div class="input-group">
+                        <label>Reason / Incident Description</label>
+                        <textarea id="reportReason" placeholder="Describe the policy violation or issue in detail..."></textarea>
+                    </div>
+                    <button class="btn btn-warning" onclick="submitReport()">Submit Report to Management</button>
+                </div>
+            </div>
+
+            <!-- HANDBOOKS & RESOURCES -->
+            <div id="resources" class="tab-content">
+                <h2>Departmental Handbooks & Resources</h2>
+                <div style="margin-bottom:15px;">
+                    <button class="btn btn-small" onclick="renderHandbooks('all')">All</button>
+                    <button class="btn btn-small" onclick="renderHandbooks('Flight Operations')">Flight Operations</button>
+                    <button class="btn btn-small" onclick="renderHandbooks('Ground Handling')">Ground Handling</button>
+                    <button class="btn btn-small" onclick="renderHandbooks('Staff Management')">Staff Management</button>
+                </div>
+                <div id="handbooksContainer" class="grid"></div>
+            </div>
+
+            <!-- ADMIN CONTROL PANEL (ADMIN ONLY) -->
+            <div id="admin" class="tab-content">
+                <h2 style="color:var(--danger);">⚙️ Admin Management Panel</h2>
+                
+                <!-- Manage Staff Roster -->
+                <div class="card">
+                    <h3>Manage Staff Account & Status</h3>
+                    <div class="grid">
+                        <div class="input-group">
+                            <label>Select Staff Member</label>
+                            <select id="adminStaffSelect" onchange="loadStaffEditData()"></select>
+                        </div>
+                        <div class="input-group">
+                            <label>Update Rank / Role Title</label>
+                            <input type="text" id="adminRankInput">
+                        </div>
+                        <div class="input-group">
+                            <label>Update Duty Status</label>
+                            <select id="adminStatusSelect">
+                                <option value="ACTIVE">ACTIVE</option>
+                                <option value="LOA">LOA (Leave of Absence)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-success" onclick="saveStaffChanges()">Save Staff Changes</button>
+                </div>
+
+                <!-- Create Event -->
+                <div class="card">
+                    <h3>Create New Training / Event</h3>
+                    <div class="input-group">
+                        <label>Event Title</label>
+                        <input type="text" id="adminEventTitle" placeholder="e.g. Flight Pilot Certification Phase 1">
+                    </div>
+                    <div class="input-group">
+                        <label>Date & Time</label>
+                        <input type="text" id="adminEventDate" placeholder="e.g. Saturday, 18:00 UTC">
+                    </div>
+                    <button class="btn" onclick="addEvent()">Publish Event</button>
+                </div>
+
+                <!-- Review Reports -->
+                <div class="card">
+                    <h3>Pending Management Reports</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Reported User</th>
+                                <th>Reported By</th>
+                                <th>Reason</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminReportsTable"></tbody>
+                    </table>
+                </div>
+
+                <!-- Add Handbook Resource -->
+                <div class="card">
+                    <h3>Add Handbook Resource</h3>
+                    <div class="input-group">
+                        <label>Department</label>
+                        <select id="adminHandbookDept">
+                            <option value="Flight Operations">Flight Operations</option>
+                            <option value="Ground Handling">Ground Handling</option>
+                            <option value="Staff Management">Staff Management</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Resource Title</label>
+                        <input type="text" id="adminHandbookTitle" placeholder="Title of guide...">
+                    </div>
+                    <div class="input-group">
+                        <label>Resource Content / Link</label>
+                        <textarea id="adminHandbookContent" placeholder="Enter guide text or documentation URL..."></textarea>
+                    </div>
+                    <button class="btn btn-success" onclick="addHandbook()">Publish Handbook</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- DATA STORE ---
+        const accounts = [
+            { username: "Him", password: "him737", role: "ADMIN", rank: "Owner//Head admin", dept: "Executive Board", status: "ACTIVE" },
+            { username: "KOD", password: "Devil", role: "ADMIN", rank: "BOD//Head Web designer", dept: "Flight Operations", status: "ACTIVE" },
+            { username: "Glitchy", password: "glitchy", role: "ADMIN", rank: "Co-Owner/Lead admin", dept: "Executive Board", status: "ACTIVE" },
+            { username: "Yajur", password: "yajur", role: "STAFF", rank: "Vice Chairman//staff", dept: "Staff Management", status: "LOA" }
+        ];
+
+        let events = [
+            { id: 1, title: "Pilot Operations Briefing", date: "Weekend Session - 16:00 UTC", attending: ["KOD"], declining: [] }
+        ];
+
+        let reports = [
+            { id: 1, target: "RuleBreaker99", reporter: "KOD", reason: "Disregarded flight coordinator instructions during group event." }
+        ];
+
+        let handbooks = [
+            { id: 1, dept: "Flight Operations", title: "Standard Pilot Protocol", content: "Ensure proper clearance before takeoff and follow standard flight routes." },
+            { id: 2, dept: "Ground Handling", title: "Gate & Fuel Safety Manual", content: "Maintain clear perimeter distance around aircraft taxing into assigned gates." }
+        ];
+
+        let currentUser = null;
+
+        // --- AUTHENTICATION ---
+        function handleLogin() {
+            const userInput = document.getElementById("login-username").value.trim();
+            const passInput = document.getElementById("login-password").value;
+            const errDisplay = document.getElementById("login-err");
+
+            const found = accounts.find(acc => acc.username.toLowerCase() === userInput.toLowerCase() && acc.password === passInput);
+
+            if (found) {
+                currentUser = found;
+                errDisplay.style.display = "none";
+                document.getElementById("logged-user-display").innerHTML = `Operator: <strong>${currentUser.username}</strong>`;
+                
+                const badge = document.getElementById("user-role-badge");
+                badge.innerText = currentUser.role;
+                badge.className = currentUser.role === "ADMIN" ? "badge badge-admin" : "badge badge-staff";
+
+                document.getElementById("admin-nav-btn").style.display = currentUser.role === "ADMIN" ? "block" : "none";
+
+                const overlay = document.getElementById("login-overlay");
+                overlay.style.opacity = "0";
+                setTimeout(() => {
+                    overlay.style.display = "none";
+                    startIntroSequence();
+                }, 400);
+
+                refreshAllViews();
+            } else {
+                errDisplay.style.display = "block";
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById("login-username").value = "";
+            document.getElementById("login-password").value = "";
+            const overlay = document.getElementById("login-overlay");
+            overlay.style.display = "flex";
+            setTimeout(() => overlay.style.opacity = "1", 50);
+        }
+
+        // --- INTRO ---
+        function startIntroSequence() {
+            const introOverlay = document.getElementById("intro-overlay");
+            introOverlay.style.display = "flex";
+            const textElement = document.getElementById("typewriter-text");
+            textElement.innerText = "";
+            const msg = `Welcome back, ${currentUser.username}. Authorized access granted for AIX Operations Control.`;
+            let idx = 0;
+            function type() {
+                if (idx < msg.length) {
+                    textElement.innerText += msg.charAt(idx);
+                    idx++;
+                    setTimeout(type, 30);
+                }
+            }
+            type();
+        }
+
+        function skipIntro() {
+            document.getElementById("intro-overlay").style.display = "none";
+        }
+
+        function switchTab(tabId, btnElement) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            if (btnElement) btnElement.classList.add('active');
+        }
+
+        // --- RENDER VIEWS ---
+        function refreshAllViews() {
+            renderRoster();
+            renderEvents();
+            renderHandbooks('all');
+            renderAdminPanel();
+            updateStats();
+        }
+
+        function updateStats() {
+            const activeCount = accounts.filter(a => a.status === "ACTIVE").length;
+            document.getElementById("stats-display").innerText = `Active Staff: ${activeCount} | Open Reports: ${reports.length}`;
+        }
+
+        function renderRoster() {
+            const search = document.getElementById("rosterSearch").value.toLowerCase();
+            const tbody = document.getElementById("rosterTableBody");
+            tbody.innerHTML = "";
+
+            accounts.filter(acc => 
+                acc.username.toLowerCase().includes(search) || 
+                acc.rank.toLowerCase().includes(search) ||
+                acc.dept.toLowerCase().includes(search)
+            ).forEach(acc => {
+                const tr = document.createElement("tr");
+                const statusClass = acc.status === "ACTIVE" ? "status-active" : "status-loa";
+                tr.innerHTML = `
+                    <td><strong>${acc.username}</strong></td>
+                    <td>${acc.rank}</td>
+                    <td>${acc.dept}</td>
+                    <td><span class="status-tag ${statusClass}">${acc.status}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderEvents() {
+            const container = document.getElementById("eventsListContainer");
+            container.innerHTML = "";
+
+            events.forEach(ev => {
+                const isAttending = ev.attending.includes(currentUser.username);
+                const isDeclining = ev.declining.includes(currentUser.username);
+
+                const div = document.createElement("div");
+                div.className = "card";
+                div.innerHTML = `
+                    <h3>${ev.title}</h3>
+                    <p><strong>Scheduled:</strong> ${ev.date}</p>
+                    <p><strong>RSVP Counts:</strong> Attending: ${ev.attending.length} | Declined: ${ev.declining.length}</p>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn btn-small ${isAttending ? 'btn-success' : ''}" onclick="rsvpEvent(${ev.id}, true)">Attending ✅</button>
+                        <button class="btn btn-small ${isDeclining ? 'btn-danger' : ''}" onclick="rsvpEvent(${ev.id}, false)">Decline ❌</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function rsvpEvent(eventId, attending) {
+            const ev = events.find(e => e.id === eventId);
+            if (!ev) return;
+
+            ev.attending = ev.attending.filter(u => u !== currentUser.username);
+            ev.declining = ev.declining.filter(u => u !== currentUser.username);
+
+            if (attending) ev.attending.push(currentUser.username);
+            else ev.declining.push(currentUser.username);
+
+            renderEvents();
+        }
+
+        function submitReport() {
+            const target = document.getElementById("reportTarget").value.trim();
+            const reason = document.getElementById("reportReason").value.trim();
+
+            if (!target || !reason) {
+                alert("Please complete all report fields.");
+                return;
+            }
+
+            reports.push({ id: Date.now(), target, reporter: currentUser.username, reason });
+            document.getElementById("reportTarget").value = "";
+            document.getElementById("reportReason").value = "";
+            alert("Report submitted to management.");
+            refreshAllViews();
+        }
+
+        function renderHandbooks(deptFilter) {
+            const container = document.getElementById("handbooksContainer");
+            container.innerHTML = "";
+
+            handbooks.filter(h => deptFilter === 'all' || h.dept === deptFilter).forEach(h => {
+                const div = document.createElement("div");
+                div.className = "card";
+                div.innerHTML = `
+                    <h3>${h.title}</h3>
+                    <p style="color:var(--accent); font-size:0.8rem;">${h.dept}</p>
+                    <p>${h.content}</p>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // --- ADMIN CONTROLS ---
+        function renderAdminPanel() {
+            if (currentUser.role !== "ADMIN") return;
+
+            // Staff Dropdown
+            const staffSelect = document.getElementById("adminStaffSelect");
+            staffSelect.innerHTML = "";
+            accounts.forEach(acc => {
+                const opt = document.createElement("option");
+                opt.value = acc.username;
+                opt.innerText = `${acc.username} (${acc.rank})`;
+                staffSelect.appendChild(opt);
+            });
+            loadStaffEditData();
+
+            // Admin Reports Table
+            const reportsBody = document.getElementById("adminReportsTable");
+            reportsBody.innerHTML = "";
+            reports.forEach(r => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td><strong>${r.target}</strong></td>
+                    <td>${r.reporter}</td>
+                    <td>${r.reason}</td>
+                    <td><button class="btn btn-small btn-danger" onclick="dismissReport(${r.id})">Dismiss / Resolve</button></td>
+                `;
+                reportsBody.appendChild(tr);
+            });
+        }
+
+        function loadStaffEditData() {
+            const selectedUsername = document.getElementById("adminStaffSelect").value;
+            const acc = accounts.find(a => a.username === selectedUsername);
+            if (acc) {
+                document.getElementById("adminRankInput").value = acc.rank;
+                document.getElementById("adminStatusSelect").value = acc.status;
+            }
+        }
+
+        function saveStaffChanges() {
+            const selectedUsername = document.getElementById("adminStaffSelect").value;
+            const acc = accounts.find(a => a.username === selectedUsername);
+            if (acc) {
+                acc.rank = document.getElementById("adminRankInput").value;
+                acc.status = document.getElementById("adminStatusSelect").value;
+                alert(`Updated details for ${acc.username}`);
+                refreshAllViews();
+            }
+        }
+
+        function addEvent() {
+            const title = document.getElementById("adminEventTitle").value.trim();
+            const date = document.getElementById("adminEventDate").value.trim();
+            if (!title || !date) return alert("Fill in event title and date.");
+
+            events.push({ id: Date.now(), title, date, attending: [], declining: [] });
+            document.getElementById("adminEventTitle").value = "";
+            document.getElementById("adminEventDate").value = "";
+            refreshAllViews();
+            alert("New event published.");
+        }
+
+        function dismissReport(reportId) {
+            reports = reports.filter(r => r.id !== reportId);
+            refreshAllViews();
+        }
+
+        function addHandbook() {
+            const dept = document.getElementById("adminHandbookDept").value;
+            const title = document.getElementById("adminHandbookTitle").value.trim();
+            const content = document.getElementById("adminHandbookContent").value.trim();
+            if (!title || !content) return alert("Fill in handbook title and content.");
+
+            handbooks.push({ id: Date.now(), dept, title, content });
+            document.getElementById("adminHandbookTitle").value = "";
+            document.getElementById("adminHandbookContent").value = "";
+            refreshAllViews();
+            alert("Handbook resource added.");
+        }
+
+        // Slideshow Loop
+        let slideIdx = 0;
+        setInterval(() => {
+            const slides = document.querySelectorAll('.slide-img');
+            if (slides.length === 0) return;
+            slides[slideIdx].classList.remove('active');
+            slideIdx = (slideIdx + 1) % slides.length;
+            slides[slideIdx].classList.add('active');
+        }, 3000);
+    </script>
+</body>
+</html>
